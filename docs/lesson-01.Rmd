@@ -1,0 +1,145 @@
+---
+title: "Geography 176C"
+subtitle: "NWM catchments and flow data"
+author: "Angus Watters"
+output:
+  xaringan::moon_reader:
+    lib_dir: libs
+    css: ucsb.css
+    nature:
+      ratio: 16:10
+      highlightStyle: github
+      highlightLines: true
+      countIncrementalSlides: false
+---
+
+```{css, eval = TRUE, echo = FALSE}
+.remark-code{line-height: 2; font-size: 80%}
+```
+```{r, include = F}
+knitr::opts_chunk$set(fig.width = 6, message = FALSE, warning = FALSE, comment = "", cache = FALSE, fig.retina = 3)
+library(flipbookr)
+library(gapminder)
+library(tidyverse)
+
+climate_graph <- function(df, lab) {
+  df$date <- paste0(df$date, "-01")
+  df$date <- as.Date(df$date)
+  rownames(df) <- df$date
+  df <- select(df, 5)
+
+  dygraph(data = df,
+            ylab = as.character(lab)) %>% 
+      dyHighlight(highlightCircleSize = 4,
+                  highlightSeriesBackgroundAlpha = .4) %>%
+      dyOptions(colors = c("navy"),
+                fillGraph = TRUE)
+}
+```
+
+# *Lightning talk!*
+
+---
+
+# **The National Water Model (NWM)**
+
+- The National Water Model (NWM) is a hydrologic modelling framework that simulates observed and forecast streamflow over the entire continental United States (CONUS). 
+
+- The NWM simulates the water cycle with mathematical representations of the different processes and how they fit together.
+
+--
+
+# **Motivation**
+
+The NWM obtains data from over 8000 USGS stream gauges in the Nation and uses this data to expand forecasts to over 2.7 million stream locations nationwide.
+This also means that there is a huge amount of historical streamflow data avalialbe at all these locations.
+
+---
+
+# **Problem**
+
+There is not an easy way to view a particular catchment and see the historical streamflow records for this catchment. The data is all there but currently there isn't a quick and easy way to view both the catchment geometry and timeseries data on demand.  
+
+--
+
+# **Solution**
+- Create a R Shiny dashboard that features an interactive map and allows the user to explore all watershed catchments in the US and to get timeseries streamflow data on demand by clicking on a catchment.
+
+- This project will be created in R using the following packages: 
+
+--
+
+**R packages**  
+`tidyr`
+`dplyer`
+`sf`
+`leaflet`
+`dataRetrieval`
+`nhdplusTools`
+`nwmTools`
+`shiny`
+---
+
+# Get COMID from a lat/long point
+
+`r flipbookr::chunk_reveal("nldi", title = "Find COMID from a lat/lng point")`
+```{r nldi, include=FALSE}
+library(dataRetrieval)
+
+nldi <- findNLDI(location = c(-95.07, 30.36))
+nldi 
+
+```
+
+---
+# Get catchment polygons from a NHD COMID
+`r flipbookr::chunk_reveal("nhd", title = "# Question 1: Counties with most cases")`
+```{r nhd, include = FALSE}
+library(nhdplusTools)
+library(ggplot2)
+nhd <- get_nhdplus(comid = nldi$comid, realization = "catchment")
+nhd
+
+ggplot() +
+  geom_sf(data = nhd)
+```
+---
+
+# Get timeseries data using COMID/point
+`r flipbookr::chunk_reveal("nwm", title = "# Question 2: States with most cases")`
+
+```{r nwm, include = FALSE}
+library(climateR)
+library(sf)
+library(dygraphs)
+
+pt <- st_centroid(nldi)
+precip <- getTerraClim(AOI = pt, param = "prcp", startDate = "2010-01-01", endDate = "2014-01-01")
+climate_graph(precip, "Volume (mm)")
+```
+---
+
+# The hidden need for ungrouping
+
+- `ungroup()` should always be  applied after the grouping calcuations.. 
+- If you forget to `ungroup()` data, future data management will likely produce errors.
+-  Even if you do not plan on performing additional calculations, it’s a good habit to keep. 
+- `ungroup()` is especially important when creating objects!!
+
+--
+
+- Think about the dimision of your data structure!
+
+--
+
+.pull-left[
+```{r}
+gapminder %>% 
+  filter(year == 2007) %>% 
+  group_by(continent) %>% 
+  mutate(mp = mean(pop)) %>%   
+  mutate(mle = mean(lifeExp)) %>% 
+  ungroup()  %>%  #<<
+  select(country, year, mp, mle) 
+```
+]
